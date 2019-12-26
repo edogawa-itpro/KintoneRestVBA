@@ -7,6 +7,11 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
+'
+' KintoneRestVBA
+' Copyright (c) 2019 edogawa-itpro
+' MIT License - https://github.com/edogawa-itpro/KintoneRestVBA
+'
 Option Explicit
 '条件付きコンパイル
 #Const Release = 1 '0:「参照設定」を使ったインテリセンスを使う

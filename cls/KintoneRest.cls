@@ -7,6 +7,11 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
+'
+' KintoneRestVBA
+' Copyright (c) 2019 edogawa-itpro
+' MIT License - https://github.com/edogawa-itpro/KintoneRestVBA
+'
 Option Explicit
 
 'ğŒ•t‚«ƒRƒ“ƒpƒCƒ‹
@@ -48,7 +53,8 @@ Option Explicit
 'ŸƒNƒ‰ƒX“à‚ÌƒOƒ[ƒoƒ‹•Ï”‚ğ’è‹` Ÿ
 '
 ' Ÿ ’è”
-' ‰Šú’l‚ÍA"Private Const" ‚Í‰Â”\B"Public Const" ‚ÍŒ¾Œêd—lã•s‰Â
+'
+' ‰Šú’l‚ÍA"Private Const" ‚Í‰Â”\B("Public Const" ‚ÍŒ¾Œêd—lã•s‰Â)
 ' ŠO‚ÉŒ©‚¹‚é‚É‚Í "Proparty" ‚É‚·‚éB
 '
 ' ƒGƒ‰[ˆ——p
@@ -110,6 +116,9 @@ Private Const KIN_FIELD_TYPE_STATUS_ASSIGNEE As String = "STATUS_ASSIGNEE"
 Private Const KIN_FIELD_TYPE_SUBTABLE As String = "SUBTABLE"
 Private Const KIN_FIELD_TYPE_FILE As String = "FILE"
 Private Const KIN_FIELD_TYPE_RICH_TEXT As String = "RICH_TEXT"
+Private Const KIN_FIELD_TYPE_RADIO_BUTTON As String = "RADIO_BUTTON"
+Private Const KIN_FIELD_TYPE_CHECK_BOX As String = "CHECK_BOX"
+
  
 'Kintone‚Ì•W€ƒtƒB[ƒ‹ƒh
 Private Const KIN_FIELD_RECORDID = "$id"
@@ -117,7 +126,11 @@ Private Const KIN_FIELD_RECORDID = "$id"
 'Kintone ‚ÌƒhƒƒCƒ“(ŒÅ’è‚É‚µ‚Æ‚«‚Ü‚·)
 Private Const KINTONE_DOMAIN As String = "cybozu.com"
 
-'‹¤’Ê•Ï”
+'
+' Ÿ •Ï”
+'
+' ƒNƒ‰ƒX“à‹¤’Ê•Ï”
+'
 Private comRest As restCommon 'RESTÀs‚ÌeƒNƒ‰ƒX
 
 Private kinSubDomain As String 'ƒvƒƒpƒeƒB€–Ú
@@ -159,12 +172,7 @@ Private kinDeleteRecords As Collection ' {"ids" : [...], "revision ]" ‚Ì [...] •
 Private kinUpdateRecords As Collection ' {"records" : [ "updatekey": {...},"record" : {...} ] ‚Ì [] “à‚Ì•”•ª
 
 'XV‘€ì—pƒŒƒR[ƒh {"record" : {...}} ‚Ì {...} •”•ª
-'  insert/update ‹¤’Ê‚É‚µ‚æ‚¤‚Æv‚Á‚½‚ªA—¼•û‚ğ‘€ì‚·‚éê‡¬—‚µ‚»‚¤‚È‚Ì‚Å•ª‚¯‚é
-'  kinFieldValues ‚É‚Í kinInsertFields ‚ğ‰î‚µ‚Ä’Ç‰Á‚·‚é
-'  —á)
-'    for i = 1 to kinInsertFields.count
-'      kinInsertFieldValues(kinInsertFields(i)) = "’l"
-'    next
+'  ƒtƒB[ƒ‹ƒhî•ñ‚Í•s—v‚©H(©•ª‚ÅƒRƒŒƒNƒVƒ‡ƒ“ŠÇ—‚·‚ê‚ÎÏ‚Ş‚Ì‚Å)
 
 '  insert —p
 Private kinInsertFields As Collection 'ƒtƒB[ƒ‹ƒhî•ñ
@@ -367,10 +375,11 @@ End Sub
 
 
 '
-'¡ ’Ç‰Á‘€ì—pƒtƒB[ƒ‹ƒh–¼‚Ì“o˜^
+'¡ ’Ç‰Á‘€ì—pƒtƒB[ƒ‹ƒh–¼‚Ì“o˜^(g—p‚µ‚È‚¢)
 '
-'   XVƒŒƒR[ƒh‚Ì’lİ’è‚ğ”Ô†(1,2,3...)‚Ås‚¤Û‚É—˜—p‚·‚é
-'     •K{‚Å‚Í‚È‚¢
+'   g‚¤‚È‚çAƒvƒƒpƒeƒB‚ÅCollection‚ğŒöŠJ‚·‚é–B
+'   XVƒŒƒR[ƒh‚Ì’lİ’è‚ğ”Ô†(1,2,3...)‚Ås‚¤Û‚É—˜—p‚µ‚½‚©‚Á‚½‚à‚Ì
+'   ƒAƒvƒŠ‘¤‚Å€–ÚŠÇ—‚·‚ê‚ÎÏ‚Ş‚Ì‚ÅAç’·‚©H
 '
 '   Variant ‚É‚µ‚Ä‚¢‚é‚Ì‚ÍA"For Each" ‘€ì“à‚Åg‚¢‚½‚¢ˆ×
 '   ’Êí‚Í‚PƒtƒB[ƒ‹ƒhB","‹æØ‚è‚Å•¡”‰Â”\‚É‚à‚µ‚Ä‚¢‚éB
@@ -386,7 +395,7 @@ Public Sub AddInsertField(name As Variant)
 End Sub
 
 '
-'¡ XV‘€ì—pƒtƒB[ƒ‹ƒh–¼‚Ì“o˜^
+'¡ XV‘€ì—pƒtƒB[ƒ‹ƒh–¼‚Ì“o˜^(g—p‚µ‚È‚¢)
 '
 '   XVƒŒƒR[ƒh‚Ì’lİ’è‚ğ”Ô†(1,2,3...)‚Ås‚¤Û‚É—˜—p‚·‚é
 '     •K{‚Å‚Í‚È‚¢
@@ -402,23 +411,23 @@ Public Sub AddUpdateField(fieldName As Variant)
 
 End Sub
 
-'¡ ’Ç‰Á‘€ì—pƒtƒB[ƒ‹ƒh‚ÌƒNƒŠƒA
+'¡ ’Ç‰Á‘€ì—pƒtƒB[ƒ‹ƒh‚ÌƒNƒŠƒA(g—p‚µ‚È‚¢)
 Public Sub ClearInsertFileds()
    
     Set kinInsertFields = New Collection
 
 End Sub
 
-'¡ XV‘€ì—pƒtƒB[ƒ‹ƒh‚ÌƒNƒŠƒA
+'¡ XV‘€ì—pƒtƒB[ƒ‹ƒh‚ÌƒNƒŠƒA(g—p‚µ‚È‚¢)
 Public Sub ClearUpdateFileds()
    
     Set kinUpdateFields = New Collection
 
 End Sub
 
-'¡ ’Ç‰Á‘€ì—pƒŒƒR[ƒh‚ÉƒtƒB[ƒ‹ƒh‚Ì’l‚ğİ’è
+'¡ ’Ç‰Á‘€ì—pƒŒƒR[ƒh‚ÉƒtƒB[ƒ‹ƒh‚Ì’l‚ğİ’è(g—p‚µ‚È‚¢)
 '   –¼‘O‚Å‚Í‚È‚­‚ ‚¦‚Ä”Ô†(1`) addInsertField() ‚µ‚½‡”Ô
-Public Sub AddInsertFieldValue(no_1 As Integer, value As Variant)
+Public Sub AddInsertFieldValueByNo(no_1 As Integer, value As Variant)
     Dim fldName As String
     Dim objValue As Dictionary
     'Todo ”ÍˆÍƒ`ƒFƒbƒN
@@ -428,12 +437,26 @@ Public Sub AddInsertFieldValue(no_1 As Integer, value As Variant)
     
 End Sub
 
+'¡ ’Ç‰Á‘€ì—pƒŒƒR[ƒh‚ÉƒtƒB[ƒ‹ƒh‚Ì’l‚ğİ’è
+Public Sub AddInsertFieldValue(fieldName As Variant, value As Variant)
+    
+    If VarType(fieldName) = vbInteger Or VarType(fieldName) = vbLong Then '‹ŒŒİŠ·
+        AddInsertFieldValueByNo fieldName, value
+        Exit Sub
+    End If
+    
+    Dim objValue As Dictionary
+    Set objValue = getFieldValueObj(fieldName, value)
+    kinInsertFieldValues.Add fieldName, objValue
+    
+End Sub
+
 '
-'¡ XV‘€ì—pƒŒƒR[ƒh‚ÉƒtƒB[ƒ‹ƒh‚Ì’l‚ğİ’è(NO‚©‚ç)
+'¡ XV‘€ì—pƒŒƒR[ƒh‚ÉƒtƒB[ƒ‹ƒh‚Ì’l‚ğİ’è(g—p‚µ‚È‚¢)
 '
 '      addUpdateField ‚µ‚½‡”Ô‚©‚ç
 '
-Public Sub AddUpdateFieldValue(no_1 As Integer, value As Variant)
+Public Sub AddUpdateFieldValueByNo(no_1 As Integer, value As Variant)
     Dim fldName As String
     fldName = kinUpdateFields(no_1) 'ƒtƒB[ƒ‹ƒh–¼
     AddUpdateFieldValueByName fldName, value
@@ -441,8 +464,22 @@ Public Sub AddUpdateFieldValue(no_1 As Integer, value As Variant)
 End Sub
 
 
-'¡ XV‘€ì—pƒŒƒR[ƒh‚ÉƒtƒB[ƒ‹ƒh‚Ì’l‚ğİ’è(–¼‘O‚©‚ç)
+'¡ XV‘€ì—pƒŒƒR[ƒh‚ÉƒtƒB[ƒ‹ƒh‚Ì’l‚ğİ’è(–¼‘O‚©‚ç)(g—p‚µ‚È‚¢)
 Public Sub AddUpdateFieldValueByName(fieldName As String, value As Variant)
+    
+    Dim objValue As Dictionary
+    Set objValue = getFieldValueObj(fieldName, value)
+    kinUpdateFieldValues.Add fieldName, objValue
+    
+End Sub
+
+'¡ XV‘€ì—pƒŒƒR[ƒh‚ÉƒtƒB[ƒ‹ƒh‚Ì’l‚ğİ’è
+Public Sub AddUpdateFieldValue(fieldName As Variant, value As Variant)
+    
+    If VarType(fieldName) = vbInteger Or VarType(fieldName) = vbLong Then '‹ŒŒİŠ·
+        AddUpdateFieldValueByNo fieldName, value
+        Exit Sub
+    End If
     
     Dim objValue As Dictionary
     Set objValue = getFieldValueObj(fieldName, value)
@@ -1064,12 +1101,17 @@ End Function
 
 '
 '¡ Œ»İ‚ÌƒŒƒR[ƒh‚©‚çƒtƒB[ƒ‹ƒh‚Ì’l‚ğæ“¾
-' –¼‘O‚©‚çæ“¾‚µ‚Ä‚¢‚é‚ªA”Ô†‚Åæ‚ë‚¤‚Æv‚¤‚Æ­XH•v‚ª•K—v
 '
 Public Function GetRecordsetFieldValue(name As Variant) As String
     Dim rec As Dictionary
+    Dim val As Variant
     Set rec = kinRecordsetRecords(kinRecordsetCursorPos)
-    GetRecordsetFieldValue = getRecordFieldValue(rec, name)
+    val = getRecordFieldValue(rec, name)
+    ' {"value":null} ‚Í ‹ó•¶š‚É•ÏŠ·
+    If IsNull(val) Then
+        val = ""
+    End If
+    GetRecordsetFieldValue = val
 
 End Function
 
@@ -1113,6 +1155,19 @@ Private Function getRecordFieldValue(rec As Dictionary, name As Variant) As Vari
 
     If fld_type = KIN_FIELD_TYPE_SUBTABLE Then
         getRecordFieldValue = "<ƒTƒuƒe[ƒuƒ‹>"
+        Exit Function
+    End If
+    
+    If fld_type = KIN_FIELD_TYPE_CHECK_BOX Then
+        Dim values As Collection
+        Set values = fld(KIN_JSON_ATTR_VALUE)
+        str = ""
+        Dim val As Variant
+        For Each val In values
+            If str <> "" Then str = str + ","
+            str = str & val
+        Next
+        getRecordFieldValue = str
         Exit Function
     End If
     
