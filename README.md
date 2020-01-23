@@ -1,4 +1,4 @@
-# KintoneRestVBA
+﻿# KintoneRestVBA
 ## Overview
 KintoneRest.cls は Excel から Kintone の Rest API を簡単に使う為のクラスです。  
 (KintoneRest.cls is Excel VBA Support Class for Kintone Rest API)  
@@ -69,4 +69,5 @@ End Sub
 - レコードの追加、更新、削除に対応しています。
 - １回のAPI呼び出しでのKintoneの行数の制限を意識する必要がありません。
 - サブテーブルの更新、プロセスの更新も一部可能です。
+- アプリケーションコピーをサンプルに追加しました。
  

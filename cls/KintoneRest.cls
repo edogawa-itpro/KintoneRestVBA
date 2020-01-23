@@ -77,12 +77,24 @@ Private Const KIN_MAX_REQUEST As Long = 20 '未サポート
 Private Const KIN_API_RECORD As String = "/k/v1/record.json"
 Private Const KIN_API_RECORDS As String = "/k/v1/records.json"
 Private Const KIN_API_BULKREQUEST As String = "/k/v1/bulkRequest.json"
-Private Const KIN_API_FIELDS As String = "/k/v1/preview/app/form/fields.json"
+Private Const KIN_API_FORM_FIELDS As String = "/k/v1/preview/app/form/fields.json"
 Private Const KIN_API_RECORD_STATUS As String = "/k/v1/record/status.json"
 Private Const KIN_API_RECORDS_STATUS As String = "/k/v1/records/status.json"
+Private Const KIN_API_APP_SETTINGS As String = "/k/v1/app/settings.json"
+Private Const KIN_API_APP_VIEWS As String = "/k/v1/app/views.json"
+Private Const KIN_API_APP_LAYOUT As String = "/k/v1/app/form/layout.json"
+Private Const KIN_API_APP_STATUS As String = "/k/v1/app/status.json"
+Private Const KIN_API_PREVIEW_APP As String = "/k/v1/preview/app.json"
+Private Const KIN_API_PREVIEW_DEPLOY As String = "/k/v1/preview/app/deploy.json"
+Private Const KIN_API_PREVIEW_SETTINGS As String = "/k/v1/preview/app/settings.json"
+Private Const KIN_API_PREVIEW_FORM_FIELDS As String = "/k/v1/preview/app/form/fields.json"
+Private Const KIN_API_PREVIEW_LAYOUT As String = "/k/v1/preview/app/form/layout.json"
+Private Const KIN_API_PREVIEW_VIEW As String = "/k/v1/preview/app/views.json"
+Private Const KIN_API_PREVIEW_STATUS As String = "/k/v1/preview/app/status.json"
 
 'KintoneのJSON内の属性名
 Private Const KIN_JSON_ATTR_APP As String = "app"
+Private Const KIN_JSON_ATTR_APPS As String = "apps"
 Private Const KIN_JSON_ATTR_NAME As String = "name"
 Private Const KIN_JSON_ATTR_TYPE As String = "type"
 Private Const KIN_JSON_ATTR_FIELD As String = "field"
@@ -221,11 +233,11 @@ Public Property Let SubDomain(SubDomain As String)
 End Property
 
 '■ アプリケーションID(Get/Let)
-Public Property Get AppId() As String
-    AppId = kinAppId
+Public Property Get appId() As String
+    appId = kinAppId
 End Property
 
-Public Property Let AppId(appricationId As String)
+Public Property Let appId(appricationId As String)
     kinAppId = appricationId
     Set kinQueryFields = New Collection
     Set kinRecordsetQueryFields = New Collection
@@ -267,7 +279,7 @@ Public Property Get AppFields() As Collection
     Dim fields As Collection
     Dim properties As Dictionary
     If kinFieldInfo Is Nothing Then
-        Set kinFieldInfo = GetFieldInfo
+        Set kinFieldInfo = getFieldInfo
     End If
     Set fields = New Collection
     Set properties = kinFieldInfo(KIN_JSON_ATTR_PROPERTIES)
@@ -427,7 +439,7 @@ End Sub
 
 '■ 追加操作用レコードにフィールドの値を設定(使用しない)
 '   名前ではなくあえて番号(1～) addInsertField() した順番
-Public Sub AddInsertFieldValueByNo(no_1 As Integer, value As Variant)
+Public Sub AddInsertFieldValueByNo(no_1 As Long, value As Variant)
     Dim fldName As String
     Dim objValue As Dictionary
     'Todo 範囲チェック
@@ -441,13 +453,17 @@ End Sub
 Public Sub AddInsertFieldValue(fieldName As Variant, value As Variant)
     
     If VarType(fieldName) = vbInteger Or VarType(fieldName) = vbLong Then '旧互換
-        AddInsertFieldValueByNo fieldName, value
+        Dim fieldNo As Long
+        fieldNo = fieldName
+        AddInsertFieldValueByNo fieldNo, value
         Exit Sub
     End If
     
     Dim objValue As Dictionary
-    Set objValue = getFieldValueObj(fieldName, value)
-    kinInsertFieldValues.Add fieldName, objValue
+    Dim name As String
+    name = fieldName
+    Set objValue = getFieldValueObj(name, value)
+    kinInsertFieldValues.Add name, objValue
     
 End Sub
 
@@ -456,7 +472,7 @@ End Sub
 '
 '      addUpdateField した順番から
 '
-Public Sub AddUpdateFieldValueByNo(no_1 As Integer, value As Variant)
+Public Sub AddUpdateFieldValueByNo(no_1 As Long, value As Variant)
     Dim fldName As String
     fldName = kinUpdateFields(no_1) 'フィールド名
     AddUpdateFieldValueByName fldName, value
@@ -474,14 +490,18 @@ Public Sub AddUpdateFieldValueByName(fieldName As String, value As Variant)
 End Sub
 
 '■ 更新操作用レコードにフィールドの値を設定
-Public Sub AddUpdateFieldValue(fieldName As Variant, value As Variant)
+Public Sub AddUpdateFieldValue(field As Variant, value As Variant)
     
-    If VarType(fieldName) = vbInteger Or VarType(fieldName) = vbLong Then '旧互換
-        AddUpdateFieldValueByNo fieldName, value
+    If VarType(field) = vbInteger Or VarType(field) = vbLong Then '旧互換
+        Dim fieldNo As Long
+        fieldNo = field
+        AddUpdateFieldValueByNo fieldNo, value
         Exit Sub
     End If
     
     Dim objValue As Dictionary
+    Dim fieldName As String
+    fieldName = field
     Set objValue = getFieldValueObj(fieldName, value)
     kinUpdateFieldValues.Add fieldName, objValue
     
@@ -626,7 +646,6 @@ Private Sub insertRecords(objAppJson As Object)
         Err.Raise USER_ERROR_EXIT, "updateRecord", USER_ERROR_EXIT_MSG
     End If
 
-
 End Sub
 
 '
@@ -705,123 +724,12 @@ Private Sub updateProcessRecords(objAppJson As Object)
 End Sub
 
 '
-'□ GET
-'  URI が違う場合だけの共通処理
-'  API文字列以降を渡す
-'  URLエンコードは呼び出し側で行っておくこと
-'
-Private Function kinGet(kinApiUri As String) As String
-    Dim resBody As String
-
-    ' 全体をやっちゃダメ(パラメータ以降だけ)
-    ' encodedUrl = Application.WorksheetFunction.EncodeURL(kinApiUri)
-    resBody = comRest.ExecGet("https://" + kinSubDomain + "." + KINTONE_DOMAIN + kinApiUri)
-        
-#If DebugLevel > 1 Then
-    Debug.Print resBody
-#End If
-    
-    kinGet = resBody
-
-End Function
-
-'
-'□ POST JSON
-'  URI が違う場合だけの共通処理
-'  JSON はオブジェクトのまま渡す
-'
-Private Function kinPostJson(kinApiUri As String, objAppJson As Object) As String
-    Dim resBody As String
-    
-#If DebugLevel > 10 Then
-    Dim strJson As String
-    strJson = ConvertToJson(objAppJson)
-    Debug.Print strJson
-#End If
-    resBody = comRest.ExecPostJson("https://" + kinSubDomain + "." + KINTONE_DOMAIN + kinApiUri, objAppJson)
-    
-#If DebugLevel > 1 Then
-    Debug.Print resBody
-#End If
-    kinPostJson = resBody
-
-End Function
-
-'
-'□ PUT JSON
-'  URI が違う場合だけの共通処理
-'  JSON はオブジェクトのまま渡す
-'
-Private Function kinPutJson(kinApiUri As String, objAppJson As Object) As String
-    Dim resBody As String
-    
-#If DebugLevel > 10 Then
-    Dim strJson As String
-    strJson = ConvertToJson(objAppJson)
-    Debug.Print strJson
-#End If
-
-    resBody = comRest.ExecPutJson("https://" + kinSubDomain + "." + KINTONE_DOMAIN + kinApiUri, objAppJson)
-    
-#If DebugLevel > 1 Then
-    Debug.Print resBody
-#End If
-    kinPutJson = resBody
-
-End Function
-
-'
-'□ DELETE JSON
-'  URI が違う場合だけの共通処理
-'  JSON はオブジェクトのまま渡す
-'
-Private Function kinDeleteJson(kinApiUri As String, objAppJson As Object) As String
-    Dim resBody As String
-    
-#If DebugLevel > 10 Then
-    Dim strJson As String
-    strJson = ConvertToJson(objAppJson)
-    Debug.Print strJson
-#End If
-
-    resBody = comRest.ExecDeleteJson("https://" + kinSubDomain + "." + KINTONE_DOMAIN + kinApiUri, objAppJson)
-    
-#If DebugLevel > 1 Then
-    Debug.Print resBody
-#End If
-
-    kinDeleteJson = resBody
-
-End Function
-
-'
-'■ Kintone 内のフィールド情報の取得
+'□ Kintone 内のフィールド情報の取得
 '   Jsonオブジェクト(Dictionary)を返す
-'   アプリID設定時に自動で取得しても良いが、user/pass の設定順も考えるとちょっと考える
-Public Function GetFieldInfo() As Variant
-    Dim resBody As String
-    Dim fields As Dictionary
+'
+Private Function getFieldInfo() As Variant
 
-    resBody = kinGet(KIN_API_FIELDS + "?app=" + kinAppId)
-    
-    resBody = Replace(resBody, vbLf, "")
-    resBody = Replace(resBody, vbCrLf, "")
-    
-#If DebugLevel > 20 Then
-    Debug.Print resBody
-#End If
-
-    Set fields = ParseJson(resBody)
-    
-    'エラーハンドリング(kintoneでは200以外はエラー)
-    If comRest.status <> 200 Then
-        MsgBox "フィールド情報取得でエラー：" + fields(KIN_JSON_ATTR_MESSAGE)
-        Set fields = New Dictionary '空
-        Err.Raise USER_ERROR_EXIT, "getFieldInfo", USER_ERROR_EXIT_MSG
-
-    End If
-
-    Set GetFieldInfo = fields
+    getFieldInfo = GetAppFormInfo(kinAppId)
 
 End Function
 
@@ -848,7 +756,7 @@ End Function
 Public Function GetFieldType(fieldName As String, Optional subTableFieldName As String) As String
     'フィールド情報の取得(１回だけ)
     If kinFieldInfo Is Nothing Then
-        Set kinFieldInfo = GetFieldInfo()
+        Set kinFieldInfo = getFieldInfo()
     End If
     Dim fields As Dictionary
     Dim fieldInfo As Dictionary
@@ -887,22 +795,27 @@ End Function
 '
 '■ 選択フィールド追加
 '   ","で複数指定可能
+' 予めフィールドを指定して読む場合に使用する
+' 自分で Collection を管理しても良いが、Query の指定を省略できる
 Public Sub AddQueryField(fieldName As Variant)
-    '不要か・・・
+    Dim strFieldName As String
+    '実体の変数で受ける事
+    strFieldName = fieldName
+    
     If kinRecordsetQueryFields Is Nothing Then
         Set kinRecordsetQueryFields = New Collection
     End If
-    If InStr(fieldName, ",") > 0 Then
+    If InStr(strFieldName, ",") > 0 Then
         Dim names() As String
-        names = Split(fieldName, ",")
+        names = Split(strFieldName, ",")
         Dim name As Variant
         For Each name In names
            kinQueryFields.Add name
            kinRecordsetQueryFields.Add name
         Next
     Else
-        kinRecordsetQueryFields.Add fieldName
-        kinQueryFields.Add fieldName
+        kinRecordsetQueryFields.Add strFieldName
+        kinQueryFields.Add strFieldName
     End If
     
 End Sub
@@ -1343,6 +1256,12 @@ End Sub
 Public Sub EndUpdateBatch()
     Dim objApp As Dictionary
 
+    If isUseBatch = False Then
+        MsgBox "BeginUpdateBatch が実行されていません！"
+        Err.Raise USER_ERROR_EXIT, "EndUpdateBatch", USER_ERROR_EXIT_MSG
+        Exit Sub
+    End If
+
     If kinInsertRecords.Count > 0 Then
         Set objApp = New Dictionary
         objApp.Add KIN_JSON_ATTR_APP, kinAppId
@@ -1715,7 +1634,7 @@ Public Sub UpdateProcess(recordId As Long, action As String, assignee As String)
         End If
     Else
         '１件実行
-        process.Add KIN_JSON_ATTR_APP, AppId
+        process.Add KIN_JSON_ATTR_APP, appId
         process.Add KIN_JSON_ATTR_ID, recordId
         process.Add KIN_JSON_ATTR_ACTION, action
         process.Add KIN_JSON_ATTR_ASSIGNEE, assignee
@@ -1805,9 +1724,393 @@ Public Sub CloseRecordset()
 End Sub
 
 '
-'■ ユーティリティ
+'◆ アプリケーション情報の取得・操作 ◆
 '
-'  Kintoneの型を考慮した値の比較   kintoneの値 - 比較値 -> -1,0,1 の何れかを返す
+'  クラス内で保持するアプリケーションIDには依存しない処理
+'
+'■ Kintone のフォームのフィールド情報の取得(アプリID指定)
+'
+Public Function GetAppFormInfo(appId As Variant) As Dictionary
+ 
+    Set GetAppFormInfo = commonGetApi(KIN_API_FORM_FIELDS & "?app=" & appId, "フォームフィールド情報取得")
+
+End Function
+
+'
+'■ Kintone のアプリ設計情報の取得
+'
+Public Function GetAppSettings(appId As Variant) As Dictionary
+    
+    Set GetAppSettings = commonGetApi(KIN_API_APP_SETTINGS & "?app=" & appId, "アプリ設定情報取得")
+
+End Function
+
+
+'
+'■ Kintone のアプリのフォームのレイアウト情報の取得
+'
+Public Function GetFormLayout(appId As Variant) As Dictionary
+    
+    Set GetFormLayout = commonGetApi(KIN_API_APP_LAYOUT & "?app=" & appId, "フォームレイアウト情報取得")
+
+End Function
+
+'
+'■ Kintone のアプリVIEW情報取得
+'
+Public Function GetAppViews(appId As Variant) As Dictionary
+    
+    Set GetAppViews = commonGetApi(KIN_API_APP_VIEWS & "?app=" & appId, "アプリVIEW設計情報取得")
+
+End Function
+
+'
+'■ Kintone のアプリのプロセス情報取得
+'
+Public Function GetAppProcess(appId As Variant) As Dictionary
+    
+    Set GetAppProcess = commonGetApi(KIN_API_APP_STATUS & "?app=" & appId, "アプリのプロセス情報取得")
+
+End Function
+
+'
+'■ Kintone 内に新規アプリを作成
+'
+'   成功すると、アプリID("app")を含むオブジェクトを返す
+'
+Public Function CreateNewApp(name As String) As Dictionary
+    Dim newApp As Dictionary
+    Set newApp = New Dictionary
+    
+    newApp.Add KIN_JSON_ATTR_NAME, name
+    
+    Set CreateNewApp = commonPostApi(KIN_API_PREVIEW_APP, newApp, "アプリ作成")
+
+End Function
+
+'
+'■ Kintone 内のプレビュー状態のアプリのフィールド情報を修正する
+'
+'  成功したら、リビジョン番号を返す
+'
+Public Function AddNewAppFormFields(formFields As Dictionary) As Variant
+    Dim resultJson As Dictionary
+    
+    Set resultJson = commonPostApi(KIN_API_PREVIEW_FORM_FIELDS, formFields, "アプリのフォーム設定")
+    
+    AddNewAppFormFields = resultJson(KIN_JSON_ATTR_REVISION)
+
+End Function
+
+'
+'■ Kintone 内にプレビュー状態のアプリのセッティング情報を修正する
+'
+'  appSettings には "app" を設定しておく
+'  成功したら、リビジョン番号を返す
+'
+Public Function UpdateNewAppSettings(appSettings As Dictionary) As Variant
+    Dim resultJson As Dictionary
+    
+    Set resultJson = commonPutApi(KIN_API_PREVIEW_SETTINGS, appSettings, "アプリの設定情報更新")
+    
+    UpdateNewAppSettings = resultJson(KIN_JSON_ATTR_REVISION)
+
+End Function
+
+'
+'■ Kintone 内のプレビュー状態のアプリのレイアウト情報を修正する
+'
+'  成功したら、リビジョン番号を返す
+'
+Public Function UpdateNewAppLayout(appLayout As Dictionary) As Variant
+    Dim resultJson As Dictionary
+    
+    Set resultJson = commonPutApi(KIN_API_PREVIEW_LAYOUT, appLayout, "アプリのレイアウト情報更新")
+    
+    UpdateNewAppLayout = resultJson(KIN_JSON_ATTR_REVISION)
+
+End Function
+
+
+'
+'■ Kintone 内のプレビュー状態のアプリのビュー情報を修正する
+'
+'  成功したら、リビジョン番号を返す
+'
+Public Function UpdateNewAppViews(appView As Dictionary) As Variant
+    Dim resultJson As Dictionary
+    
+    Set resultJson = commonPutApi(KIN_API_PREVIEW_VIEW, appView, "アプリのビュー情報更新")
+    
+    UpdateNewAppViews = resultJson(KIN_JSON_ATTR_REVISION)
+
+End Function
+
+
+'
+'■ Kintone のプロセス情報更新
+'
+'  成功したら、リビジョン番号を返す
+'
+Public Function UpdateNewAppProcess(process As Dictionary) As Variant
+    Dim resultJson As Dictionary
+    
+    Set resultJson = commonPutApi(KIN_API_PREVIEW_STATUS, process, "プロセス更新")
+    
+    UpdateNewAppProcess = resultJson(KIN_JSON_ATTR_REVISION)
+
+End Function
+
+'
+'■ Kintone 内のプレビュー状態のアプリをデプロイする
+'
+'   成功したら、リビジョン番号を返す
+'
+Public Function DeployPreviewApp(appId As Variant) As Variant
+    Dim deployApp As Dictionary
+    Dim resultJson As Dictionary
+    Dim apps As Collection
+    Dim app As Dictionary
+    
+    Set apps = New Collection
+    Set deployApp = New Dictionary
+    Set app = New Dictionary
+    deployApp.Add KIN_JSON_ATTR_APPS, apps
+    app.Add KIN_JSON_ATTR_APP, appId
+    apps.Add app
+    
+    Set resultJson = commonPostApi(KIN_API_PREVIEW_DEPLOY, deployApp, "アプリのデプロイ処理")
+    
+    DeployPreviewApp = resultJson(KIN_JSON_ATTR_REVISION)
+
+End Function
+
+'
+'□ GET 共通処理
+'    url --- kintone API とパラメータを含む
+'    errMsg --- 呼び出し元の処理内容
+'
+'    成功したら、JSON オブジェクトを返す
+'
+Private Function commonGetApi(url As String, errMsg As String) As Dictionary
+    Dim resBody As String
+    Dim resJson As Dictionary
+    Set resJson = New Dictionary
+    
+    resBody = kinGet(url)
+    
+    resBody = Replace(resBody, vbLf, "")
+    resBody = Replace(resBody, vbCrLf, "")
+    
+#If DebugLevel > 20 Then
+    Debug.Print resBody
+#End If
+
+    'エラーハンドリング(kintoneでは200以外はエラー)
+    If comRest.status <> 200 Then
+        Dim errJson As Dictionary
+        Set errJson = ParseJson(resBody)
+        MsgBox errMsg & "でエラー：" & errJson(KIN_JSON_ATTR_MESSAGE)
+        Err.Raise USER_ERROR_EXIT, "commonGetApi", USER_ERROR_EXIT_MSG
+
+    Else
+        Set resJson = ParseJson(resBody)
+    End If
+
+    Set commonGetApi = resJson
+
+End Function
+
+'
+'□ POST 共通処理
+'    url --- kintone API とパラメータを含む
+'    reqJson --- 引き渡す JSON オブジェクト
+'    errMsg --- 呼び出し元の処理内容
+'
+'    成功したら、JSON オブジェクトを返す
+'
+Private Function commonPostApi(url As String, reqJson As Dictionary, errMsg As String) As Dictionary
+    Set commonPostApi = commonPutPostApi(True, url, reqJson, errMsg)
+End Function
+
+
+'
+'□ PUT 共通処理
+'    url --- kintone API とパラメータを含む
+'    reqJson --- 引き渡す JSON オブジェクト
+'    errMsg --- 呼び出し元の処理内容
+'
+'    成功したら、JSON オブジェクトを返す
+'
+Private Function commonPutApi(url As String, reqJson As Dictionary, errMsg As String) As Dictionary
+    Set commonPutApi = commonPutPostApi(False, url, reqJson, errMsg)
+End Function
+
+'
+'□ PUT/POST 共通処理
+'
+'   使い分ける違いが解からない。上書きがPUTか・・・
+'
+Private Function commonPutPostApi(isPost As Boolean, url As String, reqJson As Dictionary, errMsg As String) As Dictionary
+    Dim resBody As String
+    Dim resJson As Dictionary
+    Set resJson = New Dictionary
+
+#If DebugLevel > 10 Then
+    Dim strJson As String
+    strJson = ConvertToJson(reqJson)
+    Debug.Print strJson
+#End If
+    
+    If isPost Then
+        resBody = kinPostJson(url, reqJson)
+    Else
+        resBody = kinPutJson(url, reqJson)
+    End If
+    
+    resBody = Replace(resBody, vbLf, "")
+    resBody = Replace(resBody, vbCrLf, "")
+    
+#If DebugLevel > 20 Then
+    Debug.Print resBody
+#End If
+
+    'エラーハンドリング(kintoneでは200以外はエラー)
+    If comRest.status <> 200 Then
+        Dim errJson As Dictionary
+        Set errJson = ParseJson(resBody)
+        MsgBox errMsg & "でエラー：" & errJson(KIN_JSON_ATTR_MESSAGE)
+        Err.Raise USER_ERROR_EXIT, "commonPutPostApi", USER_ERROR_EXIT_MSG
+
+    Else
+        Set resJson = ParseJson(resBody)
+    End If
+
+    Set commonPutPostApi = resJson
+
+End Function
+
+'
+'□ GET
+'  URI が違う場合だけの共通処理
+'  API文字列以降を渡す
+'  URLエンコードは呼び出し側で行っておくこと
+'
+Private Function kinGet(kinApiUri As String) As String
+    Dim resBody As String
+
+    ' 全体をやっちゃダメ(パラメータ以降だけ)
+    ' encodedUrl = Application.WorksheetFunction.EncodeURL(kinApiUri)
+    resBody = comRest.ExecGet("https://" + kinSubDomain + "." + KINTONE_DOMAIN + kinApiUri)
+        
+#If DebugLevel > 1 Then
+    Debug.Print resBody
+#End If
+    
+    kinGet = resBody
+
+End Function
+
+'
+'□ GET Json
+'  滅多に無い呼び出し方法だが・・・
+Private Function kinGetJson(kinApiUri As String, objJson As Dictionary) As String
+    Dim resBody As String
+    
+#If DebugLevel > 10 Then
+    Dim strJson As String
+    strJson = ConvertToJson(objJson)
+    Debug.Print strJson
+#End If
+
+    ' 全体をやっちゃダメ(パラメータ以降だけ)
+    ' encodedUrl = Application.WorksheetFunction.EncodeURL(kinApiUri)
+    resBody = comRest.ExecGetJson("https://" + kinSubDomain + "." + KINTONE_DOMAIN + kinApiUri, objJson)
+        
+#If DebugLevel > 1 Then
+    Debug.Print resBody
+#End If
+    
+    kinGetJson = resBody
+
+End Function
+
+'
+'□ POST JSON
+'  URI が違う場合だけの共通処理
+'  JSON はオブジェクトのまま渡す
+'
+Private Function kinPostJson(kinApiUri As String, objAppJson As Object) As String
+    Dim resBody As String
+    
+#If DebugLevel > 10 Then
+    Dim strJson As String
+    strJson = ConvertToJson(objAppJson)
+    Debug.Print strJson
+#End If
+    resBody = comRest.ExecPostJson("https://" + kinSubDomain + "." + KINTONE_DOMAIN + kinApiUri, objAppJson)
+    
+#If DebugLevel > 1 Then
+    Debug.Print resBody
+#End If
+    kinPostJson = resBody
+
+End Function
+
+'
+'□ PUT JSON
+'  URI が違う場合だけの共通処理
+'  JSON はオブジェクトのまま渡す
+'
+Private Function kinPutJson(kinApiUri As String, objAppJson As Object) As String
+    Dim resBody As String
+    
+#If DebugLevel > 10 Then
+    Dim strJson As String
+    strJson = ConvertToJson(objAppJson)
+    Debug.Print strJson
+#End If
+
+    resBody = comRest.ExecPutJson("https://" + kinSubDomain + "." + KINTONE_DOMAIN + kinApiUri, objAppJson)
+    
+#If DebugLevel > 1 Then
+    Debug.Print resBody
+#End If
+    kinPutJson = resBody
+
+End Function
+
+'
+'□ DELETE JSON
+'  URI が違う場合だけの共通処理
+'  JSON はオブジェクトのまま渡す
+'
+Private Function kinDeleteJson(kinApiUri As String, objAppJson As Object) As String
+    Dim resBody As String
+    
+#If DebugLevel > 10 Then
+    Dim strJson As String
+    strJson = ConvertToJson(objAppJson)
+    Debug.Print strJson
+#End If
+
+    resBody = comRest.ExecDeleteJson("https://" + kinSubDomain + "." + KINTONE_DOMAIN + kinApiUri, objAppJson)
+    
+#If DebugLevel > 1 Then
+    Debug.Print resBody
+#End If
+
+    kinDeleteJson = resBody
+
+End Function
+
+'
+'◆ ユーティリティ ◆
+
+'
+'■ Kintoneの型を考慮した値の比較
+'
+'   kintoneの値 - 比較値 -> -1,0,1 の何れかを返す
 '
 Public Function CompareValue(fieldName As String, kinValue As Variant, dataValue As Variant) As Integer
     Dim retVal As Integer
@@ -1861,5 +2164,24 @@ Public Function CompareValue(fieldName As String, kinValue As Variant, dataValue
 
 End Function
 
+'
+' ブランクフォームの項目
+'
+'   将来変更される可能性がある
+'
+Public Function GetBlankFormFields() As Collection
+    Dim formFields As Collection
+    Set formFields = New Collection
+    
+    formFields.Add "カテゴリー"
+    formFields.Add "レコード番号"
+    formFields.Add "作業者"
+    formFields.Add "更新者"
+    formFields.Add "作成者"
+    formFields.Add "ステータス"
+    formFields.Add "更新日時"
+    formFields.Add "作成日時"
+    
+    Set GetBlankFormFields = formFields
 
-
+End Function
