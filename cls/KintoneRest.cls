@@ -80,10 +80,13 @@ Private Const KIN_API_BULKREQUEST As String = "/k/v1/bulkRequest.json"
 Private Const KIN_API_FORM_FIELDS As String = "/k/v1/preview/app/form/fields.json"
 Private Const KIN_API_RECORD_STATUS As String = "/k/v1/record/status.json"
 Private Const KIN_API_RECORDS_STATUS As String = "/k/v1/records/status.json"
+
 Private Const KIN_API_APP_SETTINGS As String = "/k/v1/app/settings.json"
 Private Const KIN_API_APP_VIEWS As String = "/k/v1/app/views.json"
 Private Const KIN_API_APP_LAYOUT As String = "/k/v1/app/form/layout.json"
 Private Const KIN_API_APP_STATUS As String = "/k/v1/app/status.json"
+Private Const KIN_API_APP_CUSTOMIZE As String = "/k/v1/app/customize.json"
+
 Private Const KIN_API_PREVIEW_APP As String = "/k/v1/preview/app.json"
 Private Const KIN_API_PREVIEW_DEPLOY As String = "/k/v1/preview/app/deploy.json"
 Private Const KIN_API_PREVIEW_SETTINGS As String = "/k/v1/preview/app/settings.json"
@@ -91,6 +94,7 @@ Private Const KIN_API_PREVIEW_FORM_FIELDS As String = "/k/v1/preview/app/form/fi
 Private Const KIN_API_PREVIEW_LAYOUT As String = "/k/v1/preview/app/form/layout.json"
 Private Const KIN_API_PREVIEW_VIEW As String = "/k/v1/preview/app/views.json"
 Private Const KIN_API_PREVIEW_STATUS As String = "/k/v1/preview/app/status.json"
+Private Const KIN_API_PREVIEW_CUSTOMIZE As String = "/k/v1/preview/app/customize.json"
 
 'KintoneのJSON内の属性名
 Private Const KIN_JSON_ATTR_APP As String = "app"
@@ -113,6 +117,9 @@ Private Const KIN_JSON_ATTR_ID As String = "id"
 Private Const KIN_JSON_ATTR_ACTION As String = "action"
 Private Const KIN_JSON_ATTR_ASSIGNEE As String = "assignee"
 Private Const KIN_JSON_ATTR_FIELDS As String = "fields"
+Private Const KIN_JSON_ATTR_LOOKUP As String = "lookup"
+Private Const KIN_JSON_ATTR_RELATEDAPP As String = "relatedApp"
+Private Const KIN_JSON_ATTR_REFERENCE As String = "referenceTable"
 
 'Kintoneのフィールド型
 Private Const KIN_FIELD_TYPE_RECORD_NUMBER As String = "RECORD_NUMBER"
@@ -130,6 +137,7 @@ Private Const KIN_FIELD_TYPE_FILE As String = "FILE"
 Private Const KIN_FIELD_TYPE_RICH_TEXT As String = "RICH_TEXT"
 Private Const KIN_FIELD_TYPE_RADIO_BUTTON As String = "RADIO_BUTTON"
 Private Const KIN_FIELD_TYPE_CHECK_BOX As String = "CHECK_BOX"
+Private Const KIN_FIELD_TYPE_REFERENCE_TABLE As String = "REFERENCE_TABLE"
 
  
 'Kintoneの標準フィールド
@@ -729,7 +737,7 @@ End Sub
 '
 Private Function getFieldInfo() As Variant
 
-    getFieldInfo = GetAppFormInfo(kinAppId)
+    Set getFieldInfo = GetAppFormInfo(kinAppId)
 
 End Function
 
@@ -1774,17 +1782,40 @@ Public Function GetAppProcess(appId As Variant) As Dictionary
 End Function
 
 '
+'■ Kintone のアプリのJavascript/CSS情報取得
+'
+Public Function GetAppCustomize(appId As Variant) As Dictionary
+    
+    Set GetAppCustomize = commonGetApi(KIN_API_APP_CUSTOMIZE & "?app=" & appId, "アプリのカスタマイズ情報取得")
+
+End Function
+
+'
 '■ Kintone 内に新規アプリを作成
 '
 '   成功すると、アプリID("app")を含むオブジェクトを返す
 '
-Public Function CreateNewApp(name As String) As Dictionary
+Public Function CreatePreviewApp(name As String) As Dictionary
     Dim newApp As Dictionary
     Set newApp = New Dictionary
     
     newApp.Add KIN_JSON_ATTR_NAME, name
     
-    Set CreateNewApp = commonPostApi(KIN_API_PREVIEW_APP, newApp, "アプリ作成")
+    Set CreatePreviewApp = commonPostApi(KIN_API_PREVIEW_APP, newApp, "アプリ作成")
+
+End Function
+
+'
+'■ Kintone 内のプレビュー状態のアプリのフィールド情報を追加する
+'
+'  成功したら、リビジョン番号を返す
+'
+Public Function AddPreviewFormFields(formFields As Dictionary) As Variant
+    Dim resultJson As Dictionary
+    
+    Set resultJson = commonPostApi(KIN_API_PREVIEW_FORM_FIELDS, formFields, "フォームフィールドの追加")
+    
+    AddPreviewFormFields = resultJson(KIN_JSON_ATTR_REVISION)
 
 End Function
 
@@ -1793,12 +1824,12 @@ End Function
 '
 '  成功したら、リビジョン番号を返す
 '
-Public Function AddNewAppFormFields(formFields As Dictionary) As Variant
+Public Function UpdatePreviewFormFields(formFields As Dictionary) As Variant
     Dim resultJson As Dictionary
     
-    Set resultJson = commonPostApi(KIN_API_PREVIEW_FORM_FIELDS, formFields, "アプリのフォーム設定")
+    Set resultJson = commonPutApi(KIN_API_PREVIEW_FORM_FIELDS, formFields, "フォームフィールド変更")
     
-    AddNewAppFormFields = resultJson(KIN_JSON_ATTR_REVISION)
+    UpdatePreviewFormFields = resultJson(KIN_JSON_ATTR_REVISION)
 
 End Function
 
@@ -1808,12 +1839,12 @@ End Function
 '  appSettings には "app" を設定しておく
 '  成功したら、リビジョン番号を返す
 '
-Public Function UpdateNewAppSettings(appSettings As Dictionary) As Variant
+Public Function UpdatePreviewSettings(appSettings As Dictionary) As Variant
     Dim resultJson As Dictionary
     
     Set resultJson = commonPutApi(KIN_API_PREVIEW_SETTINGS, appSettings, "アプリの設定情報更新")
     
-    UpdateNewAppSettings = resultJson(KIN_JSON_ATTR_REVISION)
+    UpdatePreviewSettings = resultJson(KIN_JSON_ATTR_REVISION)
 
 End Function
 
@@ -1822,12 +1853,12 @@ End Function
 '
 '  成功したら、リビジョン番号を返す
 '
-Public Function UpdateNewAppLayout(appLayout As Dictionary) As Variant
+Public Function UpdatePreviewLayout(appLayout As Dictionary) As Variant
     Dim resultJson As Dictionary
     
     Set resultJson = commonPutApi(KIN_API_PREVIEW_LAYOUT, appLayout, "アプリのレイアウト情報更新")
     
-    UpdateNewAppLayout = resultJson(KIN_JSON_ATTR_REVISION)
+    UpdatePreviewLayout = resultJson(KIN_JSON_ATTR_REVISION)
 
 End Function
 
@@ -1837,12 +1868,27 @@ End Function
 '
 '  成功したら、リビジョン番号を返す
 '
-Public Function UpdateNewAppViews(appView As Dictionary) As Variant
+Public Function UpdatePreviewViews(appView As Dictionary) As Variant
     Dim resultJson As Dictionary
     
     Set resultJson = commonPutApi(KIN_API_PREVIEW_VIEW, appView, "アプリのビュー情報更新")
     
-    UpdateNewAppViews = resultJson(KIN_JSON_ATTR_REVISION)
+    UpdatePreviewViews = resultJson(KIN_JSON_ATTR_REVISION)
+
+End Function
+
+
+'
+'■ Kintone 内のプレビュー状態のアプリのJavascript/CSS情報を修正する
+'
+'  成功したら、リビジョン番号を返す
+'
+Public Function UpdatePreviewCustomize(appView As Dictionary) As Variant
+    Dim resultJson As Dictionary
+    
+    Set resultJson = commonPutApi(KIN_API_PREVIEW_CUSTOMIZE, appView, "アプリのJavascript/CSS情報更新")
+    
+    UpdatePreviewCustomize = resultJson(KIN_JSON_ATTR_REVISION)
 
 End Function
 
@@ -1852,12 +1898,12 @@ End Function
 '
 '  成功したら、リビジョン番号を返す
 '
-Public Function UpdateNewAppProcess(process As Dictionary) As Variant
+Public Function UpdatePreviewProcess(process As Dictionary) As Variant
     Dim resultJson As Dictionary
     
     Set resultJson = commonPutApi(KIN_API_PREVIEW_STATUS, process, "プロセス更新")
     
-    UpdateNewAppProcess = resultJson(KIN_JSON_ATTR_REVISION)
+    UpdatePreviewProcess = resultJson(KIN_JSON_ATTR_REVISION)
 
 End Function
 
@@ -1885,6 +1931,73 @@ Public Function DeployPreviewApp(appId As Variant) As Variant
 
 End Function
 
+'
+'■ Kintoneのフィールドに関連アプリIDがあるか探しあれば項目名のCollectionを返す
+'
+
+' 指定された属性を持つフィールドの名前を返す
+Public Function GetRelatedFieldNames(formInfo As Dictionary) As Collection
+    Dim relFields As Collection
+    Set relFields = New Collection
+
+    Dim fields As Dictionary
+    Set fields = formInfo(KIN_JSON_ATTR_PROPERTIES)
+    Dim key As Variant
+    Dim field As Dictionary
+    For Each key In fields.Keys
+        Set field = fields(key)
+        If field.Exists(KIN_JSON_ATTR_LOOKUP) Then
+            relFields.Add key
+        ElseIf field.Exists(KIN_JSON_ATTR_REFERENCE) Then
+            relFields.Add key
+        End If
+    Next
+    Set GetRelatedFieldNames = relFields
+
+End Function
+
+'
+'■ Kintoneの関連アプリケーションIDの変更
+'
+Public Function UpdateRelatedFieldAppId(formInfo As Dictionary, fieldName As Variant, appId As Variant) As Boolean
+
+    Dim fields As Dictionary
+    Set fields = formInfo(KIN_JSON_ATTR_PROPERTIES)
+    Dim field As Dictionary
+    Set field = fields(fieldName)
+    Dim refInfo As Dictionary
+    If field.Exists(KIN_JSON_ATTR_REFERENCE) Then
+        Set refInfo = field(KIN_JSON_ATTR_REFERENCE)
+    ElseIf field.Exists(KIN_JSON_ATTR_LOOKUP) Then
+        Set refInfo = field(KIN_JSON_ATTR_LOOKUP)
+    Else
+        UpdateRelatedFieldAppId = False
+        Exit Function
+    End If
+    Dim relatedApp As Dictionary
+    Set relatedApp = refInfo(KIN_JSON_ATTR_RELATEDAPP)
+    relatedApp.Remove KIN_JSON_ATTR_APP
+    relatedApp.Add KIN_JSON_ATTR_APP, appId
+    
+    UpdateRelatedFieldAppId = True
+
+End Function
+
+'
+'■ Kintoneのフィールド削除
+'
+Public Function DeleteFormField(formInfo As Dictionary, fieldName As Variant) As Boolean
+
+    Dim fields As Dictionary
+    Set fields = formInfo(KIN_JSON_ATTR_PROPERTIES)
+    
+    DeleteFormField = False
+    If fields.Exists(fieldName) Then
+        fields.Remove fieldName
+        DeleteFormField = True
+    End If
+
+End Function
 '
 '□ GET 共通処理
 '    url --- kintone API とパラメータを含む
